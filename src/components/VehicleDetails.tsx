@@ -96,7 +96,7 @@ const DocumentCard = ({ type, expiryDate, onView }: any) => {
     );
 };
 
-const VehicleDetails = () => {
+const VehicleDetails = ({ vehicleId }: { vehicleId: string }) => {
     const [vehicle, setVehicle] = useState<any>(null);
     const [docs, setDocs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -107,14 +107,14 @@ const VehicleDetails = () => {
     useEffect(() => {
         async function fetchDetails() {
             setLoading(true);
-            const { data: vData } = await supabase.from('vehicles').select('*').single();
-            const { data: dData } = await supabase.from('documents').select('*');
+            const { data: vData } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
+            const { data: dData } = await supabase.from('documents').select('*').eq('vehicle_id', vehicleId);
             if (vData) setVehicle(vData);
             if (dData) setDocs(dData);
             setLoading(false);
         }
         fetchDetails();
-    }, []);
+    }, [vehicleId]);
 
     if (loading) return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>

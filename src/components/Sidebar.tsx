@@ -1,5 +1,6 @@
 import {
     LayoutDashboard,
+    LayoutGrid,
     Car,
     Wrench,
     Settings,
@@ -114,7 +115,7 @@ const Sidebar = ({ isOpen, setIsOpen, activeSection, onNavigate }: SidebarProps)
 
             <div style={{ flex: 1 }}>
                 <SidebarItem icon={LayoutDashboard} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => onNavigate('dashboard')} />
-                <SidebarItem icon={Car} label="My Vehicles" active={activeSection === 'vehicles'} onClick={() => onNavigate('vehicles')} />
+                <SidebarItem icon={LayoutGrid} label="My Garage" active={activeSection === 'garage'} onClick={() => onNavigate('garage')} />
                 <SidebarItem icon={Wrench} label="Service Logs" active={activeSection === 'logs'} onClick={() => onNavigate('logs')} />
                 <SidebarItem icon={Package} label="Parts Inventory" active={activeSection === 'parts'} onClick={() => onNavigate('parts')} />
                 <SidebarItem icon={History} label="Maintenance Hist." active={activeSection === 'history'} onClick={() => onNavigate('logs')} />

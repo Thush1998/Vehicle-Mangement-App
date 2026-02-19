@@ -83,7 +83,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, color, children, onCl
     );
 };
 
-const Dashboard = () => {
+const Dashboard = ({ vehicleId }: { vehicleId: string }) => {
     const [vehicle, setVehicle] = useState<any>(null);
     const [documents, setDocuments] = useState<any[]>([]);
     const [insights, setInsights] = useState<string>('Analyzing fuel quality...');
@@ -94,8 +94,8 @@ const Dashboard = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        const { data: vData } = await supabase.from('vehicles').select('*').single();
-        const { data: dData } = await supabase.from('documents').select('*');
+        const { data: vData } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
+        const { data: dData } = await supabase.from('documents').select('*').eq('vehicle_id', vehicleId);
 
         if (vData) setVehicle(vData);
         if (dData) setDocuments(dData);
@@ -109,7 +109,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [vehicleId]);
 
     const handleUpdateOdometer = async () => {
         if (!newOdom || isNaN(Number(newOdom))) {

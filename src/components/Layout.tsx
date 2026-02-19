@@ -15,8 +15,8 @@ const Layout = ({ children, activeSection, onNavigate }: LayoutProps) => {
         switch (activeSection) {
             case 'dashboard':
                 return { title: 'Dashboard Overview', subtitle: 'Track your vehicle health effortlessly.' };
-            case 'vehicles':
-                return { title: 'My Vehicles', subtitle: 'Manage your garage and documents.' };
+            case 'garage':
+                return { title: 'My Garage', subtitle: 'Manage your vehicle collection and assets.' };
             case 'logs':
                 return { title: 'Service Logs', subtitle: 'Historical maintenance record and receipts.' };
             case 'parts':

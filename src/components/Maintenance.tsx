@@ -63,7 +63,7 @@ const PartCard = ({ name, price, availability, image, category }: any) => (
     </div>
 );
 
-const Maintenance = () => {
+const Maintenance = ({ vehicleId }: { vehicleId: string }) => {
     const [newOdometer, setNewOdometer] = useState('');
     const [fuelStation, setFuelStation] = useState('Ceypetco');
     const [isListening, setIsListening] = useState(false);
@@ -89,6 +89,7 @@ const Maintenance = () => {
         const { data } = await supabase
             .from('maintenance_logs')
             .select('*')
+            .eq('vehicle_id', vehicleId)
             .order('service_date', { ascending: false });
         if (data) setLogs(data);
         setLoading(false);
@@ -96,7 +97,7 @@ const Maintenance = () => {
 
     useEffect(() => {
         fetchLogs();
-    }, []);
+    }, [vehicleId]);
 
     const handleUpdateOdometer = async () => {
         const odo = parseInt(newOdometer);
@@ -105,7 +106,7 @@ const Maintenance = () => {
             return;
         }
 
-        const { data: vehicle } = await supabase.from('vehicles').select('*').single();
+        const { data: vehicle } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
         if (vehicle) {
             if (odo <= vehicle.last_odometer) {
                 showToast('Must be higher than current', 'error');
@@ -113,9 +114,9 @@ const Maintenance = () => {
             }
 
             const distance = odo - vehicle.last_odometer;
-            await supabase.from('vehicles').update({ last_odometer: odo }).eq('id', vehicle.id);
+            await supabase.from('vehicles').update({ last_odometer: odo }).eq('id', vehicleId);
             await supabase.from('trips').insert({
-                vehicle_id: vehicle.id,
+                vehicle_id: vehicleId,
                 distance: Math.max(0, distance),
                 odometer_reading: odo,
                 trip_date: new Date().toISOString()
@@ -135,10 +136,9 @@ const Maintenance = () => {
         }
 
         try {
-            const { data: vehicle } = await supabase.from('vehicles').select('*').single();
             const { error } = await supabase.from('maintenance_logs').insert([{
                 ...formData,
-                vehicle_id: vehicle.id,
+                vehicle_id: vehicleId,
                 total_cost: Number(formData.labor_cost || 0) + Number(formData.parts_cost || 0)
             }]);
 
