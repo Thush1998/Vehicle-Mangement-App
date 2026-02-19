@@ -140,6 +140,7 @@ const Dashboard = () => {
                 .insert([{
                     vehicle_id: vehicle.id,
                     distance: distance,
+                    odometer_reading: value,
                     trip_date: new Date().toISOString()
                 }]);
 
