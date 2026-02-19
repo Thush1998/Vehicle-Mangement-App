@@ -95,9 +95,13 @@ const Dashboard = () => {
 
     const calculateHealth = (lastService: number, threshold: number) => {
         if (!vehicle) return 100;
-        const distance = vehicle.last_odometer - lastService;
-        return Math.max(0, 100 - Math.round((distance / threshold) * 100));
+        const distanceSinceService = vehicle.last_odometer - lastService;
+        const health = Math.round(((threshold - distanceSinceService) / threshold) * 100);
+        return Math.max(0, health);
     };
+
+    const oilHealth = calculateHealth(vehicle?.oil_last_service || 0, 5000);
+    const brakeHealth = calculateHealth(vehicle?.brake_last_service || 0, 30000);
 
     const calculateExpiryDays = (dateStr: string) => {
         const diff = new Date(dateStr).getTime() - new Date().getTime();
@@ -193,25 +197,29 @@ const Dashboard = () => {
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Engine Oil Health</p>
                             <div style={{ height: '6px', background: '#2a2a2d', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
                                 <div style={{
-                                    width: `${calculateHealth(vehicle?.oil_last_service || 0, 8000)}%`,
+                                    width: `${oilHealth}%`,
                                     height: '100%',
-                                    background: calculateHealth(vehicle?.oil_last_service || 0, 8000) > 30 ? 'var(--accent-secondary)' : 'var(--accent-danger)',
+                                    background: oilHealth > 30 ? 'var(--accent-secondary)' : 'var(--accent-danger)',
                                     transition: 'width 0.5s ease'
                                 }}></div>
                             </div>
-                            <p style={{ fontSize: '0.85rem', marginTop: '4px', fontWeight: 600 }}>{calculateHealth(vehicle?.oil_last_service || 0, 8000)}% Remaining</p>
+                            <p style={{ fontSize: '0.85rem', marginTop: '4px', fontWeight: 600 }}>
+                                {oilHealth === 0 ? '0% - Service Overdue' : `${oilHealth}% Remaining`}
+                            </p>
                         </div>
                         <div>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Brake Pads Health</p>
                             <div style={{ height: '6px', background: '#2a2a2d', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
                                 <div style={{
-                                    width: `${calculateHealth(vehicle?.brake_last_service || 0, 30000)}%`,
+                                    width: `${brakeHealth}%`,
                                     height: '100%',
-                                    background: calculateHealth(vehicle?.brake_last_service || 0, 30000) > 30 ? 'var(--accent-primary)' : 'var(--accent-danger)',
+                                    background: brakeHealth > 30 ? 'var(--accent-primary)' : 'var(--accent-danger)',
                                     transition: 'width 0.5s ease'
                                 }}></div>
                             </div>
-                            <p style={{ fontSize: '0.85rem', marginTop: '4px', fontWeight: 600 }}>{calculateHealth(vehicle?.brake_last_service || 0, 30000)}% Remaining</p>
+                            <p style={{ fontSize: '0.85rem', marginTop: '4px', fontWeight: 600 }}>
+                                {brakeHealth === 0 ? '0% - Service Overdue' : `${brakeHealth}% Remaining`}
+                            </p>
                         </div>
                         <div>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Digital Vault</p>
@@ -234,22 +242,40 @@ const Dashboard = () => {
                         <span style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}>View All</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '12px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                            <div style={{ color: 'var(--accent-danger)' }}><AlertTriangle size={20} /></div>
-                            <div style={{ flex: 1 }}>
-                                <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Check Brake Pads</p>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Predictor Estimate: Critical</p>
+                        {oilHealth <= 20 && (
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '12px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                <div style={{ color: 'var(--accent-danger)' }}><AlertTriangle size={20} /></div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Change Engine Oil</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        {oilHealth === 0 ? 'Priority: Urgent' : `Remaining: ${oilHealth}%`}
+                                    </p>
+                                </div>
+                                <ChevronRight size={16} color="var(--text-secondary)" />
                             </div>
-                            <ChevronRight size={16} color="var(--text-secondary)" />
-                        </div>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '12px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                            <div style={{ color: 'var(--accent-secondary)' }}><ShieldCheck size={20} /></div>
-                            <div style={{ flex: 1 }}>
-                                <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Emission Test Renew</p>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Next Month: March 15</p>
+                        )}
+                        {brakeHealth <= 20 && (
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '12px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                <div style={{ color: 'var(--accent-danger)' }}><AlertTriangle size={20} /></div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Check Brake Pads</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        {brakeHealth === 0 ? 'Priority: Urgent' : `Remaining: ${brakeHealth}%`}
+                                    </p>
+                                </div>
+                                <ChevronRight size={16} color="var(--text-secondary)" />
                             </div>
-                            <ChevronRight size={16} color="var(--text-secondary)" />
-                        </div>
+                        )}
+                        {documents.some(doc => calculateExpiryDays(doc.expiry_date) < 30) && (
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '12px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                                <div style={{ color: '#fbbf24' }}><ShieldCheck size={20} /></div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Document Renewal</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Next Expiry: {Math.min(...documents.map(d => calculateExpiryDays(d.expiry_date)))} days</p>
+                                </div>
+                                <ChevronRight size={16} color="var(--text-secondary)" />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
