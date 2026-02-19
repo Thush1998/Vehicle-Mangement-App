@@ -83,8 +83,9 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, color, children, onCl
     );
 };
 
-const Dashboard = ({ vehicleId }: { vehicleId: string }) => {
+const Dashboard = ({ vehicleId, onSwitch }: { vehicleId: string, onSwitch: (id: string) => void }) => {
     const [vehicle, setVehicle] = useState<any>(null);
+    const [allVehicles, setAllVehicles] = useState<any[]>([]);
     const [documents, setDocuments] = useState<any[]>([]);
     const [insights, setInsights] = useState<string>('Analyzing fuel quality...');
     const [loading, setLoading] = useState(true);
@@ -94,12 +95,25 @@ const Dashboard = ({ vehicleId }: { vehicleId: string }) => {
 
     const fetchData = async () => {
         setLoading(true);
-        const { data: vData } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
-        const { data: dData } = await supabase.from('documents').select('*').eq('vehicle_id', vehicleId);
+        // Clear previous state to ensure visual sync
+        setVehicle(null);
 
-        if (vData) setVehicle(vData);
-        if (dData) setDocuments(dData);
-        setLoading(false);
+        try {
+            const { data: vData, error: vError } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
+            const { data: dData } = await supabase.from('documents').select('*').eq('vehicle_id', vehicleId);
+            const { data: allVData } = await supabase.from('vehicles').select('id, name').order('name');
+
+            if (vError) throw vError;
+
+            setVehicle(vData);
+            setDocuments(dData || []);
+            setAllVehicles(allVData || []);
+        } catch (error: any) {
+            console.error('Error fetching dashboard data:', error);
+            showToast(error.message, 'error');
+        } finally {
+            setLoading(false);
+        }
 
         // Mock insight for Fuel Station Quality
         setTimeout(() => {
@@ -189,6 +203,26 @@ const Dashboard = ({ vehicleId }: { vehicleId: string }) => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {/* Header Switcher */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '4px' }}>Welcome Back</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Everything looks good with your fleet today.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <select
+                        className="glass-input"
+                        style={{ width: 'auto', paddingRight: '40px', background: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)' }}
+                        value={vehicleId}
+                        onChange={(e) => onSwitch(e.target.value)}
+                    >
+                        {allVehicles.map(v => (
+                            <option key={v.id} value={v.id} style={{ background: '#0f172a' }}>{v.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             {/* Top Stats */}
             <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                 <StatCard
@@ -259,7 +293,7 @@ const Dashboard = ({ vehicleId }: { vehicleId: string }) => {
                 <div className="glass-card" style={{ padding: '0', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                         height: '240px',
-                        background: 'linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&q=80&w=1000") center/cover',
+                        background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url("${vehicle?.image_url || 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&q=80&w=1000'}") center/cover`,
                         display: 'flex',
                         alignItems: 'flex-end',
                         padding: '24px'

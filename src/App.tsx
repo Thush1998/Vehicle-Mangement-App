@@ -21,7 +21,7 @@ function App() {
         <Layout activeSection={activeSection} onNavigate={setActiveSection}>
             <div style={{ minHeight: 'calc(100vh - 120px)' }}>
                 {activeSection === 'dashboard' && (
-                    selectedVehicleId ? <Dashboard vehicleId={selectedVehicleId} /> : <Garage onSelect={setSelectedVehicleId} />
+                    selectedVehicleId ? <Dashboard vehicleId={selectedVehicleId} onSwitch={setSelectedVehicleId} /> : <Garage onSelect={setSelectedVehicleId} />
                 )}
                 {activeSection === 'garage' && <Garage onSelect={setSelectedVehicleId} selectedId={selectedVehicleId} />}
                 {activeSection === 'vehicles' && selectedVehicleId && <VehicleDetails vehicleId={selectedVehicleId} />}
