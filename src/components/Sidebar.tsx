@@ -19,6 +19,8 @@ interface SidebarItemProps {
 interface SidebarProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
+    activeSection: string;
+    onNavigate: (section: string) => void;
 }
 
 const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) => (
@@ -55,7 +57,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) =
     </div>
 );
 
-const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
+const Sidebar = ({ isOpen, setIsOpen, activeSection, onNavigate }: SidebarProps) => {
     return (
         <div style={{
             width: 'var(--sidebar-width)',
@@ -111,12 +113,12 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
             </div>
 
             <div style={{ flex: 1 }}>
-                <SidebarItem icon={LayoutDashboard} label="Dashboard" active />
-                <SidebarItem icon={Car} label="My Vehicles" />
-                <SidebarItem icon={Wrench} label="Service Logs" />
-                <SidebarItem icon={Package} label="Parts Inventory" />
-                <SidebarItem icon={History} label="Maintenance Hist." />
-                <SidebarItem icon={Bell} label="Reminders" />
+                <SidebarItem icon={LayoutDashboard} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => onNavigate('dashboard')} />
+                <SidebarItem icon={Car} label="My Vehicles" active={activeSection === 'vehicles'} onClick={() => onNavigate('vehicles')} />
+                <SidebarItem icon={Wrench} label="Service Logs" active={activeSection === 'logs'} onClick={() => onNavigate('logs')} />
+                <SidebarItem icon={Package} label="Parts Inventory" active={activeSection === 'parts'} onClick={() => onNavigate('parts')} />
+                <SidebarItem icon={History} label="Maintenance Hist." active={activeSection === 'history'} onClick={() => onNavigate('logs')} />
+                <SidebarItem icon={Bell} label="Reminders" active={activeSection === 'reminders'} onClick={() => onNavigate('dashboard')} />
             </div>
 
             <div style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>

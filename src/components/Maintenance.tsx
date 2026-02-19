@@ -11,6 +11,9 @@ import {
     Fuel as FuelIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import Modal from './Modal';
+import { useToast } from './Toast';
+import { useEffect } from 'react';
 
 const PartCard = ({ name, price, availability, image, category }: any) => (
     <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -64,29 +67,115 @@ const Maintenance = () => {
     const [newOdometer, setNewOdometer] = useState('');
     const [fuelStation, setFuelStation] = useState('Ceypetco');
     const [isListening, setIsListening] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [showRecordModal, setShowRecordModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedLog, setSelectedLog] = useState<any>(null);
+    const { showToast } = useToast();
+
+    // Form state
+    const [formData, setFormData] = useState({
+        service_type: 'Full Service',
+        service_date: new Date().toISOString().split('T')[0],
+        odometer_reading: '',
+        labor_cost: '',
+        parts_cost: '',
+        notes: ''
+    });
+
+    const fetchLogs = async () => {
+        setLoading(true);
+        const { data } = await supabase
+            .from('maintenance_logs')
+            .select('*')
+            .order('service_date', { ascending: false });
+        if (data) setLogs(data);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchLogs();
+    }, []);
 
     const handleUpdateOdometer = async () => {
         const odo = parseInt(newOdometer);
-        if (!odo) return;
+        if (!odo) {
+            showToast('Enter a valid reading', 'error');
+            return;
+        }
 
         const { data: vehicle } = await supabase.from('vehicles').select('*').single();
         if (vehicle) {
+            if (odo <= vehicle.last_odometer) {
+                showToast('Must be higher than current', 'error');
+                return;
+            }
+
             const distance = odo - vehicle.last_odometer;
-
-            // Update Vehicle
             await supabase.from('vehicles').update({ last_odometer: odo }).eq('id', vehicle.id);
-
-            // Create Trip
             await supabase.from('trips').insert({
                 vehicle_id: vehicle.id,
                 distance: Math.max(0, distance),
-                odometer_reading: odo
+                odometer_reading: odo,
+                trip_date: new Date().toISOString()
             });
 
             setNewOdometer('');
-            alert(`Trip recorded: ${distance}km added!`);
+            showToast('Trip logged successfully!', 'success');
+            // Refresh logic: would be better with an event, but fetch here works
+            fetchLogs();
         }
     };
+
+    const handleAddRecord = async () => {
+        if (!formData.odometer_reading || !formData.parts_cost) {
+            showToast('Fill required fields', 'error');
+            return;
+        }
+
+        try {
+            const { data: vehicle } = await supabase.from('vehicles').select('*').single();
+            const { error } = await supabase.from('maintenance_logs').insert([{
+                ...formData,
+                vehicle_id: vehicle.id,
+                total_cost: Number(formData.labor_cost || 0) + Number(formData.parts_cost || 0)
+            }]);
+
+            if (error) throw error;
+
+            showToast('Maintenance record saved!', 'success');
+            setShowRecordModal(false);
+            fetchLogs();
+            setFormData({
+                service_type: 'Full Service',
+                service_date: new Date().toISOString().split('T')[0],
+                odometer_reading: '',
+                labor_cost: '',
+                parts_cost: '',
+                notes: ''
+            });
+        } catch (error: any) {
+            showToast(error.message, 'error');
+        }
+    };
+
+    if (loading) return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+            <div className="spinner"></div>
+            <style>{`
+                .spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid rgba(59, 130, 246, 0.1);
+                    border-left-color: var(--accent-primary);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
+        </div>
+    );
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -180,17 +269,13 @@ const Maintenance = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h3 style={{ fontSize: '1.25rem' }}>Maintenance & Service History</h3>
                     <button
+                        onClick={() => setShowRecordModal(true)}
+                        className="btn-primary"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: 'var(--accent-primary)',
-                            border: 'none',
                             padding: '10px 20px',
-                            borderRadius: '12px',
-                            color: 'white',
-                            fontWeight: 600,
-                            cursor: 'pointer'
                         }}
                     >
                         <Plus size={18} /> Add New Record
@@ -210,23 +295,35 @@ const Maintenance = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {[
-                                { type: 'Full Service', date: 'Jan 15, 2024', mileage: '24,100 km', labor: '12,500', parts: '28,400', total: '40,900' },
-                                { type: 'Brake Pad Replacement', date: 'Nov 02, 2023', mileage: '21,500 km', labor: '4,500', parts: '15,000', total: '19,500' },
-                                { type: 'Tire Rotation', date: 'Aug 20, 2023', mileage: '18,200 km', labor: '3,000', parts: '0', total: '3,000' }
-                            ].map((item, i) => (
+                            {logs.map((item, i) => (
                                 <tr key={i} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                                    <td style={{ padding: '16px', fontWeight: 600 }}>{item.type}</td>
-                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{item.date}</td>
-                                    <td style={{ padding: '16px' }}>{item.mileage}</td>
-                                    <td style={{ padding: '16px' }}>{item.labor}</td>
-                                    <td style={{ padding: '16px' }}>{item.parts}</td>
-                                    <td style={{ padding: '16px', color: 'var(--accent-secondary)', fontWeight: 700 }}>{item.total}</td>
+                                    <td style={{ padding: '16px', fontWeight: 600 }}>{item.service_type}</td>
+                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                                        {new Date(item.service_date).toLocaleDateString()}
+                                    </td>
+                                    <td style={{ padding: '16px' }}>{item.odometer_reading?.toLocaleString()} km</td>
+                                    <td style={{ padding: '16px' }}>{item.labor_cost?.toLocaleString()}</td>
+                                    <td style={{ padding: '16px' }}>{item.parts_cost?.toLocaleString()}</td>
+                                    <td style={{ padding: '16px', color: 'var(--accent-secondary)', fontWeight: 700 }}>
+                                        {(item.total_cost || 0).toLocaleString()}
+                                    </td>
                                     <td style={{ padding: '16px' }}>
-                                        <button style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}>Details</button>
+                                        <button
+                                            onClick={() => { setSelectedLog(item); setShowDetailModal(true); }}
+                                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                        >
+                                            Details
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
+                            {logs.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        No service records found. Start by adding one!
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -276,6 +373,124 @@ const Maintenance = () => {
                     image="https://images.unsplash.com/photo-1578844541735-373970729792?auto=format&fit=crop&q=80&w=800"
                 />
             </div>
+            {/* Modals */}
+            <Modal isOpen={showRecordModal} onClose={() => setShowRecordModal(false)} title="New Maintenance Record">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                            <label className="input-label">Service Type</label>
+                            <select
+                                value={formData.service_type}
+                                onChange={(e) => setFormData({ ...formData, service_type: e.target.value })}
+                                className="glass-input"
+                            >
+                                <option value="Full Service">Full Service</option>
+                                <option value="Engine Oil Change">Engine Oil Change</option>
+                                <option value="Brake Pad Replacement">Brake Pad Replacement</option>
+                                <option value="Tire Rotation">Tire Rotation</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="input-label">Date</label>
+                            <input
+                                type="date"
+                                value={formData.service_date}
+                                onChange={(e) => setFormData({ ...formData, service_date: e.target.value })}
+                                className="glass-input"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="input-label">Odometer (km)</label>
+                        <input
+                            type="number"
+                            value={formData.odometer_reading}
+                            onChange={(e) => setFormData({ ...formData, odometer_reading: e.target.value })}
+                            placeholder="Reading at service..."
+                            className="glass-input"
+                        />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                            <label className="input-label">Labor Cost (LKR)</label>
+                            <input
+                                type="number"
+                                value={formData.labor_cost}
+                                onChange={(e) => setFormData({ ...formData, labor_cost: e.target.value })}
+                                placeholder="0"
+                                className="glass-input"
+                            />
+                        </div>
+                        <div>
+                            <label className="input-label">Parts Cost (LKR)</label>
+                            <input
+                                type="number"
+                                value={formData.parts_cost}
+                                onChange={(e) => setFormData({ ...formData, parts_cost: e.target.value })}
+                                placeholder="0"
+                                className="glass-input"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="input-label">Notes</label>
+                        <textarea
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            placeholder="Bill details, workshop name..."
+                            className="glass-input"
+                            style={{ minHeight: '80px', resize: 'none' }}
+                        />
+                    </div>
+                    <button onClick={handleAddRecord} className="btn-primary" style={{ padding: '14px', marginTop: '8px' }}>
+                        Save Record
+                    </button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={showDetailModal} onClose={() => setShowDetailModal(false)} title="Service Detail">
+                {selectedLog && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)' }}>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Type</p>
+                                <p style={{ fontWeight: 700 }}>{selectedLog.service_type}</p>
+                            </div>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Date</p>
+                                <p style={{ fontWeight: 700 }}>{new Date(selectedLog.service_date).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Mileage</p>
+                                <p style={{ fontWeight: 700 }}>{selectedLog.odometer_reading?.toLocaleString()} km</p>
+                            </div>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Total Cost</p>
+                                <p style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>LKR {selectedLog.total_cost?.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Notes & Bills</h4>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                                {selectedLog.notes || 'No detailed notes provided for this service entry.'}
+                            </p>
+                        </div>
+                        <div style={{
+                            height: '140px',
+                            borderRadius: '12px',
+                            background: 'rgba(255,255,255,0.05)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px dashed var(--glass-border)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.85rem'
+                        }}>
+                            Receipt attachment preview (Coming Soon)
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

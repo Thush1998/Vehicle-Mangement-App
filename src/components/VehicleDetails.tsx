@@ -10,8 +10,10 @@ import {
     Plus
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import Modal from './Modal';
+import { useToast } from './Toast';
 
-const DocumentCard = ({ type, expiryDate }: any) => {
+const DocumentCard = ({ type, expiryDate, onView }: any) => {
     const diff = new Date(expiryDate).getTime() - new Date().getTime();
     const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
     const isExpired = daysLeft < 0;
@@ -59,21 +61,24 @@ const DocumentCard = ({ type, expiryDate }: any) => {
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
-                <button style={{
-                    flex: 1,
-                    padding: '8px',
-                    borderRadius: '8px',
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    border: 'none',
-                    color: 'var(--accent-primary)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                }}>
+                <button
+                    onClick={onView}
+                    style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '8px',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        border: 'none',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                    }}
+                >
                     <Download size={14} /> View
                 </button>
                 <button style={{
@@ -94,16 +99,28 @@ const DocumentCard = ({ type, expiryDate }: any) => {
 const VehicleDetails = () => {
     const [vehicle, setVehicle] = useState<any>(null);
     const [docs, setDocs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showPreview, setShowPreview] = useState(false);
+    const [selectedDoc, setSelectedDoc] = useState<any>(null);
+    const { showToast } = useToast();
 
     useEffect(() => {
         async function fetchDetails() {
+            setLoading(true);
             const { data: vData } = await supabase.from('vehicles').select('*').single();
             const { data: dData } = await supabase.from('documents').select('*');
             if (vData) setVehicle(vData);
             if (dData) setDocs(dData);
+            setLoading(false);
         }
         fetchDetails();
     }, []);
+
+    if (loading) return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+            <div className="spinner"></div>
+        </div>
+    );
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -164,7 +181,12 @@ const VehicleDetails = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
                     {docs.map((doc, i) => (
-                        <DocumentCard key={i} type={doc.type} expiryDate={doc.expiry_date} />
+                        <DocumentCard
+                            key={i}
+                            type={doc.type}
+                            expiryDate={doc.expiry_date}
+                            onView={() => { setSelectedDoc(doc); setShowPreview(true); }}
+                        />
                     ))}
                     <div className="vault-item">
                         <Plus size={32} color="var(--text-secondary)" />
@@ -172,6 +194,46 @@ const VehicleDetails = () => {
                     </div>
                 </div>
             </div>
+            {/* Modals */}
+            <Modal isOpen={showPreview} onClose={() => setShowPreview(false)} title={`Preview: ${selectedDoc?.type}`}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{
+                        width: '100%',
+                        height: '300px',
+                        background: 'rgba(255,255,255,0.02)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid var(--glass-border)',
+                        overflow: 'hidden'
+                    }}>
+                        {selectedDoc?.type === 'Revenue License' ? (
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <Shield size={48} color="var(--accent-secondary)" style={{ marginBottom: '16px' }} />
+                                <p style={{ fontWeight: 600 }}>Government Revenue License</p>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Valid until {new Date(selectedDoc.expiry_date).toLocaleDateString()}</p>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <Shield size={48} color="var(--accent-primary)" style={{ marginBottom: '16px' }} />
+                                <p style={{ fontWeight: 600 }}>Insurance Certificate</p>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status: Verified</p>
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                        <button onClick={() => setShowPreview(false)} style={{ padding: '10px 20px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', cursor: 'pointer' }}>Close</button>
+                        <button
+                            className="btn-primary"
+                            style={{ padding: '10px 20px' }}
+                            onClick={() => showToast('Starting download...', 'success')}
+                        >
+                            Download PDF
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

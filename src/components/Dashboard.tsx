@@ -11,16 +11,27 @@ import {
     Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import Modal from './Modal';
+import { useToast } from './Toast';
 
-const StatCard = ({ title, value, unit, icon: Icon, trend, color, children }: any) => {
+const StatCard = ({ title, value, unit, icon: Icon, trend, color, children, onClick }: any) => {
     const [isHovered, setIsHovered] = useState(false);
 
     return (
         <div
             className="glass-card"
-            style={{ padding: '24px', flex: 1, position: 'relative' }}
+            style={{
+                padding: '24px',
+                flex: 1,
+                position: 'relative',
+                cursor: onClick ? 'pointer' : 'default',
+                transition: 'transform 0.2s ease'
+            }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onClick={onClick}
+            onMouseDown={(e) => onClick && (e.currentTarget.style.transform = 'scale(0.98)')}
+            onMouseUp={(e) => onClick && (e.currentTarget.style.transform = 'scale(1)')}
         >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div style={{
@@ -76,22 +87,72 @@ const Dashboard = () => {
     const [vehicle, setVehicle] = useState<any>(null);
     const [documents, setDocuments] = useState<any[]>([]);
     const [insights, setInsights] = useState<string>('Analyzing fuel quality...');
+    const [loading, setLoading] = useState(true);
+    const [showOdomModal, setShowOdomModal] = useState(false);
+    const [newOdom, setNewOdom] = useState('');
+    const { showToast } = useToast();
+
+    const fetchData = async () => {
+        setLoading(true);
+        const { data: vData } = await supabase.from('vehicles').select('*').single();
+        const { data: dData } = await supabase.from('documents').select('*');
+
+        if (vData) setVehicle(vData);
+        if (dData) setDocuments(dData);
+        setLoading(false);
+
+        // Mock insight for Fuel Station Quality
+        setTimeout(() => {
+            setInsights('Ceypetco gives you 1.8km/L more than IOC based on recent logs.');
+        }, 1500);
+    };
 
     useEffect(() => {
-        async function fetchData() {
-            const { data: vData } = await supabase.from('vehicles').select('*').single();
-            const { data: dData } = await supabase.from('documents').select('*');
-
-            if (vData) setVehicle(vData);
-            if (dData) setDocuments(dData);
-
-            // Mock insight for Fuel Station Quality
-            setTimeout(() => {
-                setInsights('Ceypetco gives you 1.8km/L more than IOC based on recent logs.');
-            }, 1500);
-        }
         fetchData();
     }, []);
+
+    const handleUpdateOdometer = async () => {
+        if (!newOdom || isNaN(Number(newOdom))) {
+            showToast('Please enter a valid odometer reading', 'error');
+            return;
+        }
+
+        const value = Number(newOdom);
+        if (value <= vehicle.last_odometer) {
+            showToast('New reading must be higher than current', 'error');
+            return;
+        }
+
+        try {
+            const distance = value - vehicle.last_odometer;
+
+            // 1. Update vehicle
+            const { error: vError } = await supabase
+                .from('vehicles')
+                .update({ last_odometer: value })
+                .eq('id', vehicle.id);
+
+            if (vError) throw vError;
+
+            // 2. Log trip
+            const { error: tError } = await supabase
+                .from('trips')
+                .insert([{
+                    vehicle_id: vehicle.id,
+                    distance: distance,
+                    trip_date: new Date().toISOString()
+                }]);
+
+            if (tError) throw tError;
+
+            showToast('Odometer updated and trip logged!', 'success');
+            setShowOdomModal(false);
+            setNewOdom('');
+            fetchData();
+        } catch (error: any) {
+            showToast(error.message, 'error');
+        }
+    };
 
     const calculateHealth = (lastService: number, threshold: number) => {
         if (!vehicle) return 100;
@@ -108,18 +169,36 @@ const Dashboard = () => {
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     };
 
+    if (loading) return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+            <div className="spinner"></div>
+            <style>{`
+                .spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid rgba(59, 130, 246, 0.1);
+                    border-left-color: var(--accent-primary);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
+        </div>
+    );
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Top Stats */}
-            <div style={{ display: 'flex', gap: '24px' }}>
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                 <StatCard
                     title="Total Odometer"
                     value={vehicle?.last_odometer?.toLocaleString() || '---'}
                     unit="km"
                     icon={Gauge}
                     color="59, 130, 246"
+                    onClick={() => setShowOdomModal(true)}
                 >
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Last trip: +45km today</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Click to update reading</p>
                 </StatCard>
 
                 <StatCard
@@ -279,6 +358,43 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
+            {/* Modals */}
+            <Modal
+                isOpen={showOdomModal}
+                onClose={() => setShowOdomModal(false)}
+                title="Update Odometer"
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                            New Odometer Reading (Current: {vehicle?.last_odometer} km)
+                        </label>
+                        <input
+                            type="number"
+                            value={newOdom}
+                            onChange={(e) => setNewOdom(e.target.value)}
+                            placeholder="Enter mileage..."
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                borderRadius: '12px',
+                                background: 'rgba(255,255,255,0.03)',
+                                border: '1px solid var(--glass-border)',
+                                color: 'white',
+                                fontSize: '1rem',
+                                outline: 'none'
+                            }}
+                        />
+                    </div>
+                    <button
+                        onClick={handleUpdateOdometer}
+                        className="btn-primary"
+                        style={{ padding: '14px', width: '100%' }}
+                    >
+                        Save & Log Trip
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };
